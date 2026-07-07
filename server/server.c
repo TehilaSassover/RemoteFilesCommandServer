@@ -2,10 +2,15 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <arpa/inet.h>
+#include <string.h>
 
 int main() {
     // Create a socket
     int server_fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (server_fd == -1) {
+        perror("Failed to create socket");
+        return 1;
+    }
     printf("Server socket file descriptor: %d\n", server_fd);
 
     // Bind the socket to an address and port
@@ -13,21 +18,37 @@ int main() {
     address.sin_family = AF_INET;
     address.sin_addr.s_addr = INADDR_ANY;
     address.sin_port = htons(8080);
-    bind(server_fd, (struct sockaddr *)&address, sizeof(address));
-    printf("Server bound");
+    int is_bound = bind(server_fd, (struct sockaddr *)&address, sizeof(address));
+    if (is_bound == -1) {
+        perror("Failed to bind socket");
+        return 1;
+    }
+    printf("Server bound to address and port\n");
 
     // Listen for incoming connections
     int backlog = 5;
-    listen(server_fd, backlog);
+    int is_listening = listen(server_fd, backlog);
+    if (is_listening == -1) {
+        perror("Failed to listen for connections");
+        return 1;
+    }
     printf("Server listening for connections...\n");
 
     // Accept a connection
     int client_fd = accept(server_fd, NULL, NULL);
+    if (client_fd == -1) {
+        perror("Failed to accept connection");
+        return 1;
+    }
     printf("Accepted a connection from client with file descriptor: %d\n", client_fd);
     
     char buffer[1024] = {0};
     read(client_fd, buffer, sizeof(buffer));
     printf("Received message from client: %s\n", buffer);
+    
+    // Send a response back to the client
+    const char *response = "Hello from server!";
+    send(client_fd, response, strlen(response), 0);
 
     // Close the sockets
     close(client_fd);
