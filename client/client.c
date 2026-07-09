@@ -29,6 +29,8 @@ const int OPERATION_COUNT = sizeof(operation_names) / sizeof(operation_names[0])
 #define HOME_DIRECTORY '~'
 #define ROOT_DIRECTORY '/'
 #define PARENT_DIRECTORY ".."
+#define MAX_CONTENT_LENGTH 1024
+#define MAX_INPUT_LENGTH 100
 
 const char *operation_descriptions[] =
     {
@@ -47,7 +49,8 @@ const char forbidden_chars[] = {
     '>',
     ':',
     '"',
-    '\\'};
+    '\\',
+    '\0'};
 
 void display_menu()
 {
@@ -65,28 +68,50 @@ void display_menu()
     printf("Your choice: ");
 }
 
-int get_user_choice()
+bool is_valid_operation(const char *input)
 {
-    int choice;
+    int value;
+    char extra;
+
+    if (input == NULL)
+    {
+        printf("Operation cannot be NULL.\n");
+        return false;
+    }
+
+    if (sscanf(input, "%d %c", &value, &extra) != 1)
+    {
+        printf("Operation must be a number.\n");
+        return false;
+    }
+
+    if (value < 0 || value >= OPERATION_COUNT)
+    {
+        printf("Operation must be between 0 and %d.\n",
+               OPERATION_COUNT - 1);
+        return false;
+    }
+
+    return true;
+}
+
+Operation get_user_choice()
+{
+    char input[MAX_INPUT_LENGTH];
+    int operation;
+
     while (1)
     {
-        if (scanf("%d", &choice) != 1)
+        fgets(input, MAX_INPUT_LENGTH, stdin);
+        input[strcspn(input, "\n")] = '\0';
+
+        if (is_valid_operation(input))
         {
-            printf("Invalid input. Please enter a number.\n");
-            while (getchar() != '\n')
-                ;
-            continue;
+            sscanf(input, "%d", &operation);
+            return (Operation)operation;
         }
 
-        while (getchar() != '\n')
-            ;
-
-        if (choice >= 0 && choice < OPERATION_COUNT)
-        {
-            return choice;
-        }
-
-        printf("Please enter a number between 0 and %d.\n", OPERATION_COUNT - 1);
+        printf("Please try again.\n");
     }
 }
 
@@ -97,6 +122,11 @@ bool is_valid_path(const char *path)
     if (path == NULL)
     {
         printf("Path cannot be NULL. ");
+        return false;
+    }
+    if (strlen(path) == 0)
+    {
+        printf("Path cannot be empty.\n");
         return false;
     }
     if (strlen(path) >= MAX_PATH_LENGTH)
@@ -128,7 +158,7 @@ bool is_valid_path(const char *path)
     {
         if (strchr(path, forbidden_chars[i]) != NULL)
         {
-            printf("Path contains forbidden character: %c. ", forbidden_chars[i]);
+            printf("Path contains forbidden character: '%c'.\n", forbidden_chars[i]);
             return false;
         }
     }
@@ -141,10 +171,56 @@ void get_file_path(char *path)
     {
         printf("Enter the file path: ");
 
-        scanf("%255s", path);
-        while (getchar() != '\n')
-            ;
+        fgets(path, MAX_PATH_LENGTH, stdin);
+        path[strcspn(path, "\n")] = '\0';
+
         if (is_valid_path(path))
+        {
+            return;
+        }
+
+        printf("Please try again.\n");
+    }
+}
+
+bool operation_requires_content(Operation operation)
+{
+    return operation == WRITE || operation == APPEND;
+}
+
+bool is_valid_content(const char *content)
+{
+    if (content == NULL)
+    {
+        printf("Content cannot be NULL.\n");
+        return false;
+    }
+
+    if (strlen(content) == 0)
+    {
+        printf("Content cannot be empty.\n");
+        return false;
+    }
+
+    if (strlen(content) >= MAX_CONTENT_LENGTH)
+    {
+        printf("Content is too long.\n");
+        return false;
+    }
+
+    return true;
+}
+
+void get_file_content(char *content)
+{
+    while (1)
+    {
+        printf("Enter the content: ");
+
+        fgets(content, MAX_CONTENT_LENGTH, stdin);
+        content[strcspn(content, "\n")] = '\0';
+
+        if (is_valid_content(content))
         {
             return;
         }
@@ -181,10 +257,10 @@ int main()
     printf("Client connected to server\n");
 
     display_menu();
-    int choice = get_user_choice();
-    printf("You chose: %s\n", operation_names[choice]);
+    Operation operation = get_user_choice();
+    printf("You chose: %s\n", operation_names[operation]);
 
-    if (choice == EXIT)
+    if (operation == EXIT)
     {
         printf("Exiting the program.\n");
         return 0;
@@ -196,9 +272,12 @@ int main()
 
     printf("path: %s\n", path);
 
-    Operation operation = get_user_choice();
+    char content[MAX_CONTENT_LENGTH] = {0};
 
-   
+    if (operation_requires_content(operation))
+    {
+        get_file_content(content);
+    }
 
     // Send a message to the server
     const char *message = "Hello from client!";
