@@ -31,6 +31,7 @@ const int OPERATION_COUNT = sizeof(operation_names) / sizeof(operation_names[0])
 #define PARENT_DIRECTORY ".."
 #define MAX_CONTENT_LENGTH 1024
 #define MAX_INPUT_LENGTH 100
+#define MAX_BUFFER_SIZE 2048
 
 const char *operation_descriptions[] =
     {
@@ -229,6 +230,38 @@ void get_file_content(char *content)
     }
 }
 
+typedef struct
+{
+    Operation operation;
+    char path[MAX_PATH_LENGTH];
+    char content[MAX_CONTENT_LENGTH];
+
+} Command;
+
+void send_command(int socket_fd, Command *command)
+{
+    char buffer[MAX_BUFFER_SIZE];
+
+    int path_length = strlen(command->path);
+    int content_length = (command->content != NULL) ? strlen(command->content) : 0;
+
+    snprintf(buffer,
+             MAX_BUFFER_SIZE,
+             "%d|%d|%d|%s%s",
+             command->operation,
+             path_length,
+             content_length,
+             command->path,
+             (command->content != NULL) ? command->content : "");
+
+    printf("Sending command: %s\n", buffer);
+
+    send(socket_fd,
+         buffer,
+         strlen(buffer),
+         0);
+}
+
 int main()
 {
     // Create a socket
@@ -279,9 +312,14 @@ int main()
         get_file_content(content);
     }
 
-    // Send a message to the server
-    const char *message = "Hello from client!";
-    send(client_fd, message, strlen(message), 0);
+    Command command;
+    command.operation = operation;
+    strcpy(command.path, path);
+    strcpy(command.content, content);
+
+    // Send the command to the server
+    send_command(client_fd, &command);
+
 
     // Receive a response from the server
     char buffer[1024] = {0};
