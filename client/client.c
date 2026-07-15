@@ -4,54 +4,42 @@
 #include <arpa/inet.h>
 #include <string.h>
 #include <stdbool.h>
+#include "../common/constants/constants.h"
+#include "../common/types/types.h"
+#include "../common/validation/validation.h"
 
-typedef enum
+int connect_to_server(const char *ip, int port)
 {
-    EXIT = 0,
-    CREATE,
-    WRITE,
-    APPEND,
-    READ,
-    DELETE
-} Operation;
+    int client_fd = socket(AF_INET, SOCK_STREAM, 0);
 
-const char *operation_names[] =
+    if (client_fd == -1)
     {
-        "EXIT",
-        "CREATE",
-        "WRITE",
-        "APPEND",
-        "READ",
-        "DELETE"};
+        perror("Failed to create socket");
+        return -1;
+    }
 
-const int OPERATION_COUNT = sizeof(operation_names) / sizeof(operation_names[0]);
-#define SPACE ' '
-#define HOME_DIRECTORY '~'
-#define ROOT_DIRECTORY '/'
-#define PARENT_DIRECTORY ".."
-#define MAX_CONTENT_LENGTH 1024
-#define MAX_INPUT_LENGTH 100
-#define MAX_BUFFER_SIZE 2048
+    printf("Client socket file descriptor: %d\n", client_fd);
 
-const char *operation_descriptions[] =
+    struct sockaddr_in server_address;
+
+    server_address.sin_family = AF_INET;
+    server_address.sin_port = htons(port);
+
+    inet_pton(AF_INET, ip, &server_address.sin_addr);
+
+    if (connect(client_fd,
+                (struct sockaddr *)&server_address,
+                sizeof(server_address)) == -1)
     {
-        "Exit the program",
-        "Create a new file",
-        "Write to a file",
-        "Append to a file",
-        "Read a file",
-        "Delete a file"};
+        perror("Failed to connect to server");
+        close(client_fd);
+        return -1;
+    }
 
-const char forbidden_chars[] = {
-    '?',
-    '*',
-    '|',
-    '<',
-    '>',
-    ':',
-    '"',
-    '\\',
-    '\0'};
+    printf("Client connected to server\n");
+
+    return client_fd;
+}
 
 void display_menu()
 {
@@ -67,33 +55,6 @@ void display_menu()
     }
 
     printf("Your choice: ");
-}
-
-bool is_valid_operation(const char *input)
-{
-    int value;
-    char extra;
-
-    if (input == NULL)
-    {
-        printf("Operation cannot be NULL.\n");
-        return false;
-    }
-
-    if (sscanf(input, "%d %c", &value, &extra) != 1)
-    {
-        printf("Operation must be a number.\n");
-        return false;
-    }
-
-    if (value < 0 || value >= OPERATION_COUNT)
-    {
-        printf("Operation must be between 0 and %d.\n",
-               OPERATION_COUNT - 1);
-        return false;
-    }
-
-    return true;
 }
 
 Operation get_user_choice()
@@ -114,56 +75,6 @@ Operation get_user_choice()
 
         printf("Please try again.\n");
     }
-}
-
-#define MAX_PATH_LENGTH 256
-
-bool is_valid_path(const char *path)
-{
-    if (path == NULL)
-    {
-        printf("Path cannot be NULL. ");
-        return false;
-    }
-    if (strlen(path) == 0)
-    {
-        printf("Path cannot be empty.\n");
-        return false;
-    }
-    if (strlen(path) >= MAX_PATH_LENGTH)
-    {
-        printf("Path is too long. ");
-        return false;
-    }
-    if (strchr(path, SPACE) != NULL)
-    {
-        printf("Path cannot contain spaces. ");
-        return false;
-    }
-    if (path[0] == ROOT_DIRECTORY)
-    {
-        printf("Absolute paths are not allowed.\n");
-        return false;
-    }
-    if (strchr(path, HOME_DIRECTORY) != NULL)
-    {
-        printf("Path cannot contain '~'.\n");
-        return false;
-    }
-    if (strstr(path, PARENT_DIRECTORY) != NULL)
-    {
-        printf("Path cannot access parent directories.\n");
-        return false;
-    }
-    for (int i = 0; forbidden_chars[i] != '\0'; i++)
-    {
-        if (strchr(path, forbidden_chars[i]) != NULL)
-        {
-            printf("Path contains forbidden character: '%c'.\n", forbidden_chars[i]);
-            return false;
-        }
-    }
-    return true;
 }
 
 void get_file_path(char *path)
@@ -189,29 +100,6 @@ bool operation_requires_content(Operation operation)
     return operation == WRITE || operation == APPEND;
 }
 
-bool is_valid_content(const char *content)
-{
-    if (content == NULL)
-    {
-        printf("Content cannot be NULL.\n");
-        return false;
-    }
-
-    if (strlen(content) == 0)
-    {
-        printf("Content cannot be empty.\n");
-        return false;
-    }
-
-    if (strlen(content) >= MAX_CONTENT_LENGTH)
-    {
-        printf("Content is too long.\n");
-        return false;
-    }
-
-    return true;
-}
-
 void get_file_content(char *content)
 {
     while (1)
@@ -229,14 +117,6 @@ void get_file_content(char *content)
         printf("Please try again.\n");
     }
 }
-
-typedef struct
-{
-    Operation operation;
-    char path[MAX_PATH_LENGTH];
-    char content[MAX_CONTENT_LENGTH];
-
-} Command;
 
 void send_command(int socket_fd, Command *command)
 {
@@ -264,35 +144,16 @@ void send_command(int socket_fd, Command *command)
 
 int main()
 {
-    // Create a socket
-    int client_fd = socket(AF_INET, SOCK_STREAM, 0);
+    int client_fd = connect_to_server("127.0.0.1", 8080);
+
     if (client_fd == -1)
     {
-        perror("Failed to create socket");
         return 1;
     }
-    printf("Client socket file descriptor: %d\n", client_fd);
-
-    struct sockaddr_in server_address;
-    server_address.sin_family = AF_INET;
-    server_address.sin_port = htons(8080);
-
-    // Convert IPv4 and IPv6 addresses from text to binary form
-    inet_pton(AF_INET, "127.0.0.1", &server_address.sin_addr);
-
-    // Connect to the server
-    int result = connect(client_fd, (struct sockaddr *)&server_address, sizeof(server_address));
-    if (result == -1)
-    {
-        perror("Failed to connect to server");
-        return 1;
-    }
-    printf("Client connected to server\n");
 
     display_menu();
     Operation operation = get_user_choice();
     printf("You chose: %s\n", operation_names[operation]);
-
     if (operation == EXIT)
     {
         printf("Exiting the program.\n");
@@ -319,7 +180,6 @@ int main()
 
     // Send the command to the server
     send_command(client_fd, &command);
-
 
     // Receive a response from the server
     char buffer[1024] = {0};
