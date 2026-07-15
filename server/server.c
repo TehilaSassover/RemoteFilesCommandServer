@@ -3,8 +3,23 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <errno.h>
+
+void initialize_working_directory(const char *path) {
+    if (mkdir(path, 0777) == -1 && errno != EEXIST) {
+        perror("Failed to create working directory");
+        return;
+    }
+}
 
 int main() {
+    
+    char *working_directory = "../storage";
+    initialize_working_directory(working_directory);
+    
+
     // Create a socket
     int server_fd = socket(AF_INET, SOCK_STREAM, 0);
     if (server_fd == -1) {
