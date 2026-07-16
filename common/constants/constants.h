@@ -7,6 +7,8 @@
 #define HOME_DIRECTORY '~'
 #define ROOT_DIRECTORY '/'
 #define PARENT_DIRECTORY ".."
+#define SEPARATOR_CHAR '|'
+#define SEPARATOR_STRING "|"
 
 
 extern const char *operation_names[];
