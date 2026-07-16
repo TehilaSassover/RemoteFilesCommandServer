@@ -57,6 +57,51 @@ void display_menu()
     printf("Your choice: ");
 }
 
+void print_validation_error(ValidationResult result)
+{
+    switch (result)
+    {
+    case INVALID_NULL:
+        printf("Input cannot be NULL.\n");
+        break;
+
+    case INVALID_EMPTY:
+        printf("Input cannot be empty.\n");
+        break;
+
+    case INVALID_TOO_LONG:
+        printf("Input is too long.\n");
+        break;
+
+    case INVALID_OPERATION:
+        printf("Invalid operation.\n");
+        break;
+
+    case INVALID_SPACE:
+        printf("Path cannot contain spaces.\n");
+        break;
+
+    case INVALID_ABSOLUTE_PATH:
+        printf("Absolute paths are not allowed.\n");
+        break;
+
+    case INVALID_HOME_PATH:
+        printf("Path cannot contain '~'.\n");
+        break;
+
+    case INVALID_PARENT_PATH:
+        printf("Path cannot access parent directories.\n");
+        break;
+
+    case INVALID_FORBIDDEN_CHAR:
+        printf("Path contains forbidden characters.\n");
+        break;
+
+    default:
+        printf("Invalid input.\n");
+    }
+}
+
 Operation get_user_choice()
 {
     char input[MAX_INPUT_LENGTH];
@@ -67,10 +112,21 @@ Operation get_user_choice()
         fgets(input, MAX_INPUT_LENGTH, stdin);
         input[strcspn(input, "\n")] = '\0';
 
-        if (is_valid_operation(input))
+        if (sscanf(input, "%d", &operation) == 1)
         {
-            sscanf(input, "%d", &operation);
-            return (Operation)operation;
+            ValidationResult result =
+                validate_operation((Operation)operation);
+
+            if (result == VALID)
+            {
+                return (Operation)operation;
+            }
+
+            print_validation_error(result);
+        }
+        else
+        {
+            printf("Operation must be a number.\n");
         }
 
         printf("Please try again.\n");
@@ -86,19 +142,19 @@ void get_file_path(char *path)
         fgets(path, MAX_PATH_LENGTH, stdin);
         path[strcspn(path, "\n")] = '\0';
 
-        if (is_valid_path(path))
+        ValidationResult result = validate_path(path);
+
+        if (result == VALID)
         {
             return;
         }
+
+        print_validation_error(result);
 
         printf("Please try again.\n");
     }
 }
 
-bool operation_requires_content(Operation operation)
-{
-    return operation == WRITE || operation == APPEND;
-}
 
 void get_file_content(char *content)
 {
@@ -109,10 +165,14 @@ void get_file_content(char *content)
         fgets(content, MAX_CONTENT_LENGTH, stdin);
         content[strcspn(content, "\n")] = '\0';
 
-        if (is_valid_content(content))
+        ValidationResult result = validate_content(content);
+
+        if (result == VALID)
         {
             return;
         }
+
+        print_validation_error(result);
 
         printf("Please try again.\n");
     }
